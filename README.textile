@@ -1,0 +1,65 @@
+ih1. testrunner.xsl
+
+TestRunner is a new, simple unit testing tool bases a single XSL document.
+
+*Some Goals*
+  * Easy and simple to start and use, just one file
+  * Gives HTML layout for monitoring results
+  * Seperating, Grouping test cases
+
+*Screenshots*
+!http://farm3.static.flickr.com/2742/4229110374_719d3f69bf_m.jpg!:http://www.flickr.com/photos/azer/4229110374/sizes/o/in/photostream/ !http://farm5.static.flickr.com/4059/4229110370_bf562c6491_m.jpg!:http://www.flickr.com/photos/azer/4229110370/sizes/o/in/photostream
+
+
+h2. How It Works
+
+  TestRunner needs to be pointed from an XML document that declares test cases which will be executed.When this document being run by a web browser, it works as a web application that let you to execute test cases you defined.You can run all of them in this layout by a single click or you can pick which test case you want to run. TestRunner creates an iframe window and includes test scripts into this window. Test scripts can throw exception or use extra functions defined by TestRunner. For now, TestRunner gives them 3 functions; assert, compare and log.
+
+h2. Usage
+  # Create an XML document that defines the test cases will be runned. For instance;<pre><code><?xml version="1.0" encoding="UTF-8"?>
+    <testcases>
+      <case>
+        <file src="math.js" /> 
+      </case>
+      <case>
+        <file src="datetime.js" /> 
+      </case>
+      <case>
+        <file src="testrunner.js" /> 
+      </case>
+      <case>
+        <file src="html5.js" /> 
+      </case>
+    </testcases></code></pre>
+
+  # Than, import TestRunner by adding this line into top of this document:
+    <pre><code><?xml-stylesheet type="text/xsl" href="../testrunner.xsl"?>
+    </code></pre>
+
+  # Now, let's create a testcase. The functions which which will be run by TestRunner should have 'test_' prefix in their names.
+   <pre><code>
+    // html5.js
+    log('hello world');
+  .
+    var test_worker = function(){
+      assert( window.Worker );
+    }
+ .
+    // this function will not be run becauseof its naming.
+    var do_sth = function(){
+      compare('give me','an error');
+    }
+ . 
+    var test_sth = function(){
+      do_sth(); // it will raise a comparasion error
+    }</code></pre>
+
+  # Now you can open this file with a web browser.That's All.
+  # Check the examples to "see it in action.":http://azer.github.com/projects/testrunner/demo/index.xml
+
+h2. About
+
+  TestRunner is being developed by Azer Koculu.To get more info, visit the "project page":http://github.com/azer/testrunner in Github: 
+
+  License: GNU GPL
+
