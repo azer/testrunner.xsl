@@ -45,7 +45,7 @@ h2. Usage
     var test_worker = function(){
       assert( window.Worker );
     }
-
+  .
     var test_async = function(){
       setTimeout(function(){
         test_async.result = true;
