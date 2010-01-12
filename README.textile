@@ -6,6 +6,7 @@ TestRunner is a simple, xslt based unit testing tool for javascript projects.
   * Easy and simple to start and use, just one file
   * Gives HTML layout for monitoring results
   * Seperating, Grouping test cases
+  * Asynchronous Tests
 
 *Screenshots*
 !http://farm3.static.flickr.com/2742/4229110374_719d3f69bf_m.jpg!:http://www.flickr.com/photos/azer/4229110374/sizes/o/in/photostream/ !http://farm5.static.flickr.com/4059/4229110370_bf562c6491_m.jpg!:http://www.flickr.com/photos/azer/4229110370/sizes/o/in/photostream
@@ -36,7 +37,7 @@ h2. Usage
     <pre><code><?xml-stylesheet type="text/xsl" href="../testrunner.xsl"?>
     </code></pre>
 
-  # Now, let's create a testcase. The functions which which will be run by TestRunner should have 'test_' prefix in their names.
+  # Let's create a testcase. The functions which which will be run by TestRunner should have 'test_' prefix in their names.
    <pre><code>
     // html5.js
     log('hello world');
@@ -44,6 +45,13 @@ h2. Usage
     var test_worker = function(){
       assert( window.Worker );
     }
+
+    var test_async = function(){
+      setTimeout(function(){
+        test_async.result = true;
+      },1000);
+    }
+    test_async.async = true;
  .
     // this function will not be run becauseof its naming.
     var do_sth = function(){
@@ -54,7 +62,7 @@ h2. Usage
       do_sth(); // it will raise a comparasion error
     }</code></pre>
 
-  # Now you can open this file with a web browser.That's All.
+  # Now you can open this file with a web browser.That's All. 
   # Check the examples to "see it in action.":http://azer.github.com/testrunner.xsl/demo/index.xml
 
 h2. About

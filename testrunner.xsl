@@ -19,6 +19,7 @@
       .ModuleList select option { display:block; padding:4px; font:12px Arial,sans-serif; }
       .ModuleList .Failure { background-color:rgb(255,150,150); } 
       .ModuleList .Success { background-color:rgb(150,255,150); } 
+      .ModuleList .InProgress { font-weight:bold; font-style:italic; background-color:rgb(220,220,220); } 
 
       .Log { height:100%; }
       .Log textarea { width:100%; height:100%; border:1px dotted #ccc; background-color:rgb( 240,250,250 ); color:#333; }
@@ -36,8 +37,8 @@
 
       function load(option){
         log('Loading '+option.value+'..');
+        option.className = 'InProgress';
         var frame = document.createElement('iframe');
-        frame.setAttribute('id','testwindow');
         frame.setAttribute('class','TestWindow');
         document.documentElement.appendChild(frame);
         var dependencies = option.getAttribute('dependencies').split(';');
@@ -46,30 +47,37 @@
           with(frame){
 
             /* load dependencies */
+            var deploaded = 0;
             for(var i=-1,len=dependencies.length; ++i<len;){
              var el = document.createElement('script');   
-             el.src = dependencies[i];
+             el.src = dependencies[i]+'?cacheForce='+Math.round(Math.random()*999);
+             el.onload = function(){
+              if(++deploaded==dependencies.length){
+                
+                // load test script
+                var test_mod = document.createElement('script');
+                test_mod.src = option.value+'?cacheForce='+Math.round( Math.random()*999 );
+                contentWindow.document.documentElement.appendChild( test_mod );
+
+                contentWindow.assert = function(expr){ if(!expr){ throw Error('Assertion Error: '+expr); }  };
+                contentWindow.compare = function(){ if(arguments[0]!=arguments[1])throw Error('Comparasion Error ('+arguments[0]+' != '+arguments[1]+')')  };
+                contentWindow.log = log;
+
+                test_mod.addEventListener('load',function(){
+                  execute(frame,option);
+                },false);
+
+              }
+             }
              contentWindow.document.documentElement.appendChild( el );
             }
 
-            // load test script
-            var test_mod = document.createElement('script');
-            test_mod.src = option.value;
-            contentWindow.document.documentElement.appendChild( test_mod );
-
-            contentWindow.assert = function(expr){ if(!expr){ throw Error('Assertion Error: '+expr); }  };
-            contentWindow.compare = function(){ if(arguments[0]!=arguments[1])throw Error('Comparasion Error ('+arguments[0]+' != '+arguments[1]+')')  };
-            contentWindow.log = log;
-
-            test_mod.addEventListener('load',function(){
-              execute(frame,option);
-            },false);
-            
 
           }
         },50);
 
       }
+
 
       function execute(frame_el,option){
         // store errors
@@ -77,25 +85,49 @@
         var win = frame_el.contentWindow;
         var functions = [];
 
+        var async_tests_done = 0;
+        var async_tests_count = 0;
+        var async_result = true;
+        var set_async_result = function(testname){ 
+          return function(res){
+
+            log( option.value+'['+testname+']: '+ (res&&'OK'||'FAILED')  + ' (Asynchronous Report '+(async_tests_done+1)+','+async_tests_count+' )' );
+
+            if(++async_tests_done>=async_tests_count){
+              option.className = !async_result&&'Failure'||'Success';
+            }
+
+          }
+        }
+
         // collect functions whose name starts width 'test' (e.g: testSomething)
         for(var key in win){
           if(key.substring(0,5)=='test_' && typeof win[ key  ] == 'function' ){
-            functions.push([ win[key], key ]);
+            var fn = [ win[key], key ];
+            functions.push(fn);
+            if(win[key].async){
+              win[key].__defineSetter__('result',set_async_result(key));
+              async_tests_count++;
+            }
           }
         }
 
         // execute found functions
         var start_date=Number(new Date());
         for(var i=-1,len=functions.length; ++i<len;){
+          var fn = functions[i];
           try {
-            functions[i][0]();
+            fn[0]();
           } catch(e){
-            errors.push( [ functions[i][1], e ] );
+            errors.push( [ fn[1], e ] );
           }
         }
         var testduration = ((Number(new Date())-start_date)/1000)+'s';
-
-        option.className = errors.length?'Failure':'Success';
+        
+        if(async_tests_count<=async_tests_done)
+          option.className = functions.length? errors.length?'Failure':'Success' : '';
+        else
+          async_result = errors.length==0;
         
         // print errors
         for(var i=-1,len=errors.length; ++i<len;){
@@ -113,13 +145,15 @@
         log(option.value+': Ran '+functions.length+' tests in '+testduration);
         if(errors.length)
           log(option.value+': FAILED(errors='+errors.length+')');
+        else if(async_tests_count>async_tests_done)
+          log(option.value+': Waiting For Asynchronous Results('+async_tests_done+','+async_tests_count+')');
         else
           log(option.value+': OK.');
         
         // remove frame
-        setTimeout(function(){
-          document.documentElement.removeChild( frame_el  );
-        },100);
+        //setTimeout(function(){
+        //  document.documentElement.removeChild( frame_el  );
+        //},100);
       }
 
       function run_selected(){
@@ -161,7 +195,7 @@
   <body>
     <table>
       <tr>
-        <td class='ListWrapper'>
+        <td class='ListWrapper' style='width:30%'>
           <fieldset class='ModuleList'>
             <legend>Test Cases</legend>
             <select id='module_list' multiple='true'>
