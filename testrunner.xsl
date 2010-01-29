@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
-
+<?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 
 <xsl:template match="/">
@@ -7,7 +6,7 @@
   <head>
     <style type='text/css'>
       <![CDATA[
-      html, body { background:#f2f2f2; font:12px Arial,sans-serif; color:#111; padding:0px; margin:0; }
+      html, body { width:100%; height:100%; overflow:hidden; background:#f2f2f2; font:12px Arial,sans-serif; color:#111; padding:0px; margin:0; }
       fieldset { background:#fff; }
       fieldset legend { background:#ffff00; color:#ff0000; font-weight:bold; text-transform:uppercase;  }
 
@@ -15,14 +14,15 @@
       table .Listwrapper { width:30%; }
 
       .ModuleList { height:100%; }
-      .ModuleList select { width:100%; height:500px; background:#fff; padding:5px; }
+      .ModuleList select { width:100%; background:#fff; padding:5px; }
       .ModuleList select option { display:block; padding:4px; font:12px Arial,sans-serif; }
       .ModuleList .Failure { background-color:rgb(255,150,150); } 
       .ModuleList .Success { background-color:rgb(150,255,150); } 
       .ModuleList .InProgress { font-weight:bold; font-style:italic; background-color:rgb(220,220,220); } 
 
       .Log { height:100%; }
-      .Log textarea { width:100%; height:100%; border:1px dotted #ccc; background-color:rgb( 240,250,250 ); color:#333; }
+      .Log textarea { width:100%; border:1px dotted #ccc; background-color:rgb( 240,250,250 ); color:#333; }
+      .Log .TestWindow { display:block; width:100%; height:60%; margin:0; background:#ddd; margin-top:5px;  }
 
       .TestWindow { display:none; }
       ]]>
@@ -35,49 +35,68 @@
         resize();
       }
 
-      function load(option){
+      function load(option,run_single){
+
         log('Loading '+option.value+'..');
         option.className = 'InProgress';
+        var id = option.value.replace(/[^\w]/g,'_');
+
+        if(document.getElementById(id)){
+          document.getElementById(id).parentNode.removeChild( document.getElementById(id) );
+        }
+
         var frame = document.createElement('iframe');
+        frame.setAttribute('id',id);
         frame.setAttribute('class','TestWindow');
-        document.documentElement.appendChild(frame);
-        var dependencies = option.getAttribute('dependencies').split(';');
+
+        if(run_single&&option.hasAttribute('display')){
+          document.getElementsByClassName('Log')[0].appendChild( frame );
+        } else {
+          document.documentElement.appendChild(frame);
+        }
+        resize();
+
+        var dependencies = option.getAttribute('dependencies').split(';').filter(function(el){ return /\w/.test(el) }).map(function(el){ return el.trim() });
 
         setTimeout(function(){
-          with(frame){
+            
+            var contentWindow = document.getElementById(id).contentWindow;
+            contentWindow.assert = function(expr){ if(!expr){ throw Error('Assertion Error: '+expr); }  };
+            contentWindow.compare = function(){ if(arguments[0]!=arguments[1])throw Error('Comparasion Error ('+arguments[0]+' != '+arguments[1]+')')  };
+            contentWindow.log = log;
 
-            /* load dependencies */
-            var deploaded = 0;
-            for(var i=-1,len=dependencies.length; ++i<len;){
-             var el = document.createElement('script');   
-             el.src = dependencies[i]+'?cacheForce='+Math.round(Math.random()*999);
-             el.onload = function(){
-              if(++deploaded==dependencies.length){
-                
-                // load test script
-                var test_mod = document.createElement('script');
-                test_mod.src = option.value+'?cacheForce='+Math.round( Math.random()*999 );
-                contentWindow.document.documentElement.appendChild( test_mod );
+            var footer = document.createElement('div');
+            footer.innerHTML='<center>'+option.value+'<br><strong>testrunner.xsl</strong></center>';
+            contentWindow.document.documentElement.appendChild( document.createElement('hr') );
+            contentWindow.document.documentElement.appendChild( footer );
 
-                contentWindow.assert = function(expr){ if(!expr){ throw Error('Assertion Error: '+expr); }  };
-                contentWindow.compare = function(){ if(arguments[0]!=arguments[1])throw Error('Comparasion Error ('+arguments[0]+' != '+arguments[1]+')')  };
-                contentWindow.log = log;
+            if(dependencies.length){
 
-                test_mod.addEventListener('load',function(){
-                  execute(frame,option);
-                },false);
-
+              var dlindex = 0;
+              var dlhandler = function(){
+                if(++dlindex<dependencies.length){
+                  load_script( contentWindow, dependencies[ dlindex ], dlhandler  );
+                } else {
+                  load_script( contentWindow, option.value, function(){
+                    execute(document.getElementById(id),option);
+                     if(!run_single)
+                      document.documentElement.removeChild( document.getElementById(id) );
+                  }); 
+                }
               }
-             }
-             contentWindow.document.documentElement.appendChild( el );
+              load_script( contentWindow, dependencies[ dlindex ], dlhandler);
             }
 
-
-          }
         },50);
 
       }
 
+      var load_script = function(win,uri,onload){
+        var el = document.createElement('script');   
+        el.src = uri+'?_cacheForce_='+Math.round(Math.random()*999)+'#';
+        el.onload = onload;
+        win.document.documentElement.appendChild(el);
+      }
 
       function execute(frame_el,option){
         // store errors
@@ -92,6 +111,9 @@
           return function(res){
 
             log( option.value+'['+testname+']: '+ (res&&'OK'||'FAILED')  + ' (Asynchronous Report '+(async_tests_done+1)+','+async_tests_count+' )' );
+
+            if(!res)
+              async_result = false;
 
             if(++async_tests_done>=async_tests_count){
               option.className = !async_result&&'Failure'||'Success';
@@ -126,19 +148,13 @@
         
         if(async_tests_count<=async_tests_done)
           option.className = functions.length? errors.length?'Failure':'Success' : '';
-        else
-          async_result = errors.length==0;
+        
+        async_result = errors.length==0;
         
         // print errors
         for(var i=-1,len=errors.length; ++i<len;){
           var error = errors[i];
-          log('\n================================');
-          log('ERROR: ' + error[0] + ' ('+option.value+')');
-          log(error[1].name+': '+error[1].message)
-          log( '-------------------------------');
-          log( error[1].stack );
-          log( '-------------------------------');
-          log('================================\n');
+          log_error(option.value,error[0],error[1]);
         }
 
         // print test result
@@ -150,10 +166,16 @@
         else
           log(option.value+': OK.');
         
-        // remove frame
-        //setTimeout(function(){
-        //  document.documentElement.removeChild( frame_el  );
-        //},100);
+      }
+
+      function log_error(url,test,error){
+        log('\n================================');
+        log('ERROR: ' + test + ' ('+url+')');
+        log(error.name+': '+error.message)
+        log( '-------------------------------');
+        log( error.stack );
+        log( '-------------------------------');
+        log('================================\n');
       }
 
       function run_selected(){
@@ -161,7 +183,7 @@
         var list = document.getElementById('module_list');
         var option = list.options[list.selectedIndex];
         list.selectedIndex = -1;
-        load(option);
+        load(option,true);
       }
 
       function run_all(){
@@ -183,7 +205,13 @@
         var vpheight=Math.max( document.body.clientHeight, document.documentElement.clientHeight );
         var modlist = document.getElementById('module_list');
         var monitor = document.getElementById('logview');
-        monitor.style.height=vpheight-62+'px';
+        var frame = document.getElementsByTagName('iframe')[0];
+        var display_frame = frame&&frame.parentNode==monitor.parentNode;
+        if(display_frame){
+          monitor.style.height=Math.round((vpheight-62)/2)+'px'
+          frame.style.height=Math.round((vpheight-72)/2)+'px'
+        } else
+          monitor.style.height=vpheight-62+'px';
         modlist.style.height=vpheight-70+'px';
       }
 
@@ -206,6 +234,9 @@
                     <xsl:value-of select="@src" />;
                   </xsl:for-each>
                 </xsl:attribute>
+                <xsl:if test='@display'>
+                  <xsl:attribute name='display'>true</xsl:attribute>
+                </xsl:if>
                 <xsl:value-of select='file/@src' />
               </option>
               </xsl:for-each>
