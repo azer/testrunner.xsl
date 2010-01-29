@@ -1,6 +1,6 @@
 h1. testrunner.xsl
 
-TestRunner is a simple a unit testing tool for javascript projects.
+TestRunner is a unit testing tool made up of just an XSL document, for javascript projects.
 
 *Some Goals*
   * Simple to start and use, just one file
