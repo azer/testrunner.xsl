@@ -29,6 +29,7 @@
     </style>
     <script>
       <![CDATA[
+      
       function init(){
         document.getElementById('run_sel').addEventListener('click',run_selected,false);
         document.getElementById('run_all').addEventListener('click',run_all,false);
@@ -49,7 +50,10 @@
         frame.setAttribute('id',id);
         frame.setAttribute('class','TestWindow');
 
-        if(run_single&&option.hasAttribute('display')){
+        var layoutView = run_single&&option.hasAttribute('display');
+        var firebug = layoutView&&option.hasAttribute('firebug');
+
+        if(layoutView){
           document.getElementsByClassName('Log')[0].appendChild( frame );
         } else {
           document.documentElement.appendChild(frame);
@@ -70,6 +74,9 @@
             contentWindow.document.documentElement.appendChild( document.createElement('hr') );
             contentWindow.document.documentElement.appendChild( footer );
 
+            if(firebug)
+              load_fblite( contentWindow );
+
             if(dependencies.length){
 
               var dlindex = 0;
@@ -77,18 +84,23 @@
                 if(++dlindex<dependencies.length){
                   load_script( contentWindow, dependencies[ dlindex ], dlhandler  );
                 } else {
-                  load_script( contentWindow, option.value, function(){
-                    execute(document.getElementById(id),option);
-                     if(!run_single)
-                      document.documentElement.removeChild( document.getElementById(id) );
-                  }); 
+                  load_testcase( contentWindow, option, id );
                 }
               }
               load_script( contentWindow, dependencies[ dlindex ], dlhandler);
+            } else {
+              load_testcase( contentWindow, option, id );
             }
-
         },50);
 
+      }
+
+      var load_testcase = function(win,option,id){
+        load_script( win, option.value, function(){
+          execute(document.getElementById(id),option);
+          if(!run_single)
+            document.documentElement.removeChild( document.getElementById(id) );
+        }); 
       }
 
       var load_script = function(win,uri,onload){
@@ -168,6 +180,19 @@
         
       }
 
+      function load_fblite(win){
+        (function(F,B,L,i,t,e){
+          e=F[B]('script');
+          e.id='FirebugLite';
+          e.src=L+t;
+          F.getElementsByTagName('head')[0].appendChild(e);
+          e=F[B]('img');
+          e.src=L+i;
+        })(
+          win.document,'createElement','http://getfirebug.com/releases/lite/alpha/','skin/xp/sprite.png','firebug.jgz#startOpened'
+        ); 
+      }
+
       function log_error(url,test,error){
         log('\n================================');
         log('ERROR: ' + test + ' ('+url+')');
@@ -207,6 +232,7 @@
         var monitor = document.getElementById('logview');
         var frame = document.getElementsByTagName('iframe')[0];
         var display_frame = frame&&frame.parentNode==monitor.parentNode;
+
         if(display_frame){
           monitor.style.height=Math.round((vpheight-62)/2)+'px'
           frame.style.height=Math.round((vpheight-72)/2)+'px'
@@ -236,6 +262,9 @@
                 </xsl:attribute>
                 <xsl:if test='@display'>
                   <xsl:attribute name='display'>true</xsl:attribute>
+                </xsl:if>
+                <xsl:if test='@firebug'>
+                  <xsl:attribute name='firebug'>true</xsl:attribute>
                 </xsl:if>
                 <xsl:value-of select='file/@src' />
               </option>

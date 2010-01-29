@@ -7,15 +7,18 @@ TestRunner is a unit testing tool made up of just an XSL document, for javascrip
   * HTML layout for monitoring results. Just one click is enought to execute hundreds tests!
   * Seperating, Grouping test cases
   * Asynchronous tests
-  * Display option to inspect DOM tests
+  * Display and Firebug options for inspecting DOM tests
+
 
 *Supported Layout Engines*
   * Gecko
   * Webkit
 
-*Screenshots*
-!http://farm3.static.flickr.com/2742/4229110374_719d3f69bf_m.jpg!:http://www.flickr.com/photos/azer/4229110374/sizes/o/in/photostream/ !http://farm5.static.flickr.com/4059/4229110370_bf562c6491_m.jpg!:http://www.flickr.com/photos/azer/4229110370/sizes/o/in/photostream !http://farm5.static.flickr.com/4045/4313322420_dd23fc4fa8_m.jpg!:http://www.flickr.com/photos/azer/4313322420/sizes/o/
+*See It In Action*
+  "http://www.flickr.com/photos/azer/4314568866/sizes/o/":http://azer.github.com/testrunner.xsl/demo/index.xml
 
+*Screenshots*
+!http://farm3.static.flickr.com/2742/4229110374_719d3f69bf_m.jpg!:http://www.flickr.com/photos/azer/4229110374/sizes/o/in/photostream/ !http://farm5.static.flickr.com/4059/4229110370_bf562c6491_m.jpg!:http://www.flickr.com/photos/azer/4229110370/sizes/o/in/photostream !http://farm5.static.flickr.com/4045/4313322420_dd23fc4fa8_m.jpg!:http://www.flickr.com/photos/azer/4313322420/sizes/o/!http://farm3.static.flickr.com/2680/4314568866_c4fbb27b20_m.jpg!:http://www.flickr.com/photos/azer/4314568866/sizes/o/
 
 h2. How It Works
 
@@ -23,7 +26,7 @@ h2. How It Works
 
 h2. Basic Usage
 
-  # Create an XML document that defines the test cases will be run. For instance;<pre><code><?xml version="1.0" encoding="UTF-8"?>
+  * Create an XML document that defines the test cases will be run. For instance;<pre><code><?xml version="1.0" encoding="UTF-8"?>
     <testcases>
       <case>
         <file src="tests/math.js" /> 
@@ -34,19 +37,19 @@ h2. Basic Usage
         <dependency src="lib/datetime.js" /> 
         <dependency src="lib/i18n.js" /> 
       </case>
-      <case display='true'>
+      <case display='true' firebug='true'>
         <file src="tests/dom.js" /> 
         <dependency src="lib/jQuery.js" /> 
       </case>
     </testcases></code></pre>
 
-  # Import TestRunner by adding this line into top of this document:
+  * Import TestRunner by adding this line into top of this document:
     <pre><code><?xml-stylesheet type="text/xsl" href="../testrunner.xsl"?>
     </code></pre>
 
-  # Now, try to open this document with a web browser. You can try to execute the tests above. You may notice "Ran 0 tests" message in the monitor. It means, TestRunner couldn't find any test function to run.
+  * It's ready to be opened in a web browser. Try to execute the tests you declared above. You will notice "Ran 0 tests" message in the monitor. It means, TestRunner couldn't find any test functions to run.
 
-  # Now let's define the test functions. The functions which will be run by TestRunner should have 'test_' prefix in their names.
+  * Now let's define some test functions. The functions which will be run by TestRunner should have 'test_' prefix in their names.
    <pre><code>
     // html5.js
     log('hello world');
@@ -70,10 +73,9 @@ h2. Basic Usage
     var test_sth = function(){
       do_sth(); // it will raise a comparasion error
     }</code></pre>
+  
+  * That's all. 
 
-  # It's ready.
-
-  # Check out the examples to "see it in action.":http://azer.github.com/testrunner.xsl/demo/index.xml
 
 h2. Development
 
