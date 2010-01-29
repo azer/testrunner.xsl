@@ -18,7 +18,7 @@ TestRunner is a unit testing tool made up of just an XSL document, for javascrip
   "http://www.flickr.com/photos/azer/4314568866/sizes/o/":http://azer.github.com/testrunner.xsl/demo/index.xml
 
 *Screenshots*
-!http://farm3.static.flickr.com/2742/4229110374_719d3f69bf_m.jpg!:http://www.flickr.com/photos/azer/4229110374/sizes/o/in/photostream/ !http://farm5.static.flickr.com/4059/4229110370_bf562c6491_m.jpg!:http://www.flickr.com/photos/azer/4229110370/sizes/o/in/photostream !http://farm5.static.flickr.com/4045/4313322420_dd23fc4fa8_m.jpg!:http://www.flickr.com/photos/azer/4313322420/sizes/o/!http://farm3.static.flickr.com/2680/4314568866_c4fbb27b20_m.jpg!:http://www.flickr.com/photos/azer/4314568866/sizes/o/
+!http://farm3.static.flickr.com/2742/4229110374_719d3f69bf_m.jpg!:http://www.flickr.com/photos/azer/4229110374/sizes/o/in/photostream/ !http://farm5.static.flickr.com/4059/4229110370_bf562c6491_m.jpg!:http://www.flickr.com/photos/azer/4229110370/sizes/o/in/photostream !http://farm5.static.flickr.com/4045/4313322420_dd23fc4fa8_m.jpg!:http://www.flickr.com/photos/azer/4313322420/sizes/o/ !http://farm3.static.flickr.com/2680/4314568866_c4fbb27b20_m.jpg!:http://www.flickr.com/photos/azer/4314568866/sizes/o/
 
 h2. How It Works
 
