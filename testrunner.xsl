@@ -1,289 +1,340 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-
-<xsl:template match="/">
-  <html>
-  <head>
-    <style type='text/css'>
-      <![CDATA[
-      html, body { width:100%; height:100%; overflow:hidden; background:#f2f2f2; font:12px Arial,sans-serif; color:#111; padding:0px; margin:0; }
-      fieldset { background:#fff; }
-      fieldset legend { background:#ffff00; color:#ff0000; font-weight:bold; text-transform:uppercase;  }
-
-      table { width:100%; height:100%; }
-      table .Listwrapper { width:30%; }
-
-      .ModuleList { height:100%; }
-      .ModuleList select { width:100%; background:#fff; padding:5px; }
-      .ModuleList select option { display:block; padding:4px; font:12px Arial,sans-serif; }
-      .ModuleList .Failure { background-color:rgb(255,150,150); } 
-      .ModuleList .Success { background-color:rgb(150,255,150); } 
-      .ModuleList .InProgress { font-weight:bold; font-style:italic; background-color:rgb(220,220,220); } 
-
-      .Log { height:100%; }
-      .Log textarea { width:100%; border:1px dotted #ccc; background-color:rgb( 240,250,250 ); color:#333; }
-      .Log .TestWindow { display:block; width:100%; height:60%; margin:0; background:#ddd; margin-top:5px;  }
-
-      .TestWindow { display:none; }
-      ]]>
-    </style>
-    <script>
-      <![CDATA[
-      
-      function init(){
-        document.getElementById('run_sel').addEventListener('click',run_selected,false);
-        document.getElementById('run_all').addEventListener('click',run_all,false);
-        resize();
-      }
-
-      function load(option,run_single){
-
-        log('Loading '+option.value+'..');
-        option.className = 'InProgress';
-        var id = option.value.replace(/[^\w]/g,'_');
-
-        if(document.getElementById(id)){
-          document.getElementById(id).parentNode.removeChild( document.getElementById(id) );
-        }
-
-        var frame = document.createElement('iframe');
-        frame.setAttribute('id',id);
-        frame.setAttribute('class','TestWindow');
-
-        var layoutView = run_single&&option.hasAttribute('display');
-        var firebug = layoutView&&option.hasAttribute('firebug');
-
-        if(layoutView){
-          document.getElementsByClassName('Log')[0].appendChild( frame );
-        } else {
-          document.documentElement.appendChild(frame);
-        }
-        resize();
-
-        var dependencies = option.getAttribute('dependencies').split(';').filter(function(el){ return /\w/.test(el) }).map(function(el){ return el.trim() });
-
-        setTimeout(function(){
+  <xsl:template match="/">
+    <html>
+      <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <title>Test: <xsl:value-of select='test/@name' /></title>
+        <script type="text/javascript" charset="utf-8"><![CDATA[
+          (function(exports){
             
-            var contentWindow = document.getElementById(id).contentWindow;
-            contentWindow.assert = function(expr){ if(!expr){ throw Error('Assertion Error: '+expr); }  };
-            contentWindow.compare = function(){ if(arguments[0]!=arguments[1])throw Error('Comparasion Error ('+arguments[0]+' != '+arguments[1]+')')  };
-            contentWindow.log = log;
+            var trident = /msie|trident/i.test(navigator.userAgent);
 
-            var footer = document.createElement('div');
-            footer.innerHTML='<center>'+option.value+'<br><strong>testrunner.xsl</strong></center>';
-            contentWindow.document.documentElement.appendChild( document.createElement('hr') );
-            contentWindow.document.documentElement.appendChild( footer );
+            var cases = exports.cases = null;
+            var recordCreationCounter = exports.recordCreationCounter = 0;
+            var scripts = exports.scripts = [];
 
-            if(firebug)
-              load_fblite( contentWindow );
+            if(trident) var sources = exports.sources = null;
+            
+            var $ = function(id){ 
+              return document.getElementById('testrunner-'+id); 
+            };
 
-            if(dependencies.length){
+            var each = function(list,fn){
+              for(var i=-1,len=list.length; ++i<len;){
+                fn( list[i], i, list );
+              }
+              return list;
+            }
 
-              var dlindex = 0;
-              var dlhandler = function(){
-                if(++dlindex<dependencies.length){
-                  load_script( contentWindow, dependencies[ dlindex ], dlhandler  );
-                } else {
-                  load_testcase( contentWindow, option, id );
+            var index = exports.index = function(list,el){
+              if(list.indexOf) return list.indexOf(el);
+              for(var i=-1,len=list.length; ++i<len;){
+                if( list[i] == el ) return i;
+              }
+              return -1;
+            }
+
+            var remove = exports.remove = function(list,index){
+              return list.slice(0,index).concat( list.slice(index+1) );
+            }
+
+            var clear = exports.clear = function(){
+              status('Clearing UI');
+              $('info-case').innerHTML=cases.length;
+              $('info-time').innerHTML='0.0';
+              $('monitor').innerHTML = '';
+              progress(0);
+            }
+
+            var fetch = exports.fetch = function(url,callback)
+            {
+              var req = typeof XMLHttpRequest != 'undefined' && new XMLHttpRequest || (function(){
+                try { return new ActiveXObject("Msxml2.XMLHTTP.6.0"); }
+                  catch (e) {}
+                try { return new ActiveXObject("Msxml2.XMLHTTP.3.0"); }
+                  catch (e) {}
+                try { return new ActiveXObject("Msxml2.XMLHTTP"); }
+                  catch (e) {}
+                throw new Error("This browser does not support XMLHttpRequest.");
+              })();
+
+              req.open('GET',url,true);
+              req.onreadystatechange = function(){
+                req.readyState == 4 && req.status == 200 && callback( req );
+              }
+              req.send(null);
+            }
+
+            var findCases = exports.findCases = function(){
+              status('Looking for test cases...');
+              cases = [];
+              for(var key in window){
+                if( /^test_/.test( key ) && typeof window[key] == "function" ){ 
+                  var fn = window[key];
+                  fn.name = key;
+                  cases.push( fn );
                 }
               }
-              load_script( contentWindow, dependencies[ dlindex ], dlhandler);
-            } else {
-              load_testcase( contentWindow, option, id );
-            }
-        },50);
 
-      }
+              if( trident ){
+                for(var i=-1,len=scripts.length; ++i<len;){
+                  var pattern = /(?:var|function)\s+(test_[\w$_-]+)/g;
+                  while( match = pattern.exec(sources[i]) ){
+                    var name = match[1], value=window[name], ind = index(cases,value);
+                    if( name in window && typeof value=="function" && ind==-1 ){
+                      value.name = name;
+                      cases.push(window[name]);
+                    }
+                  }
+                }
+              }
 
-      var load_testcase = function(win,option,id){
-        load_script( win, option.value, function(){
-          execute(document.getElementById(id),option);
-          if(!run_single)
-            document.documentElement.removeChild( document.getElementById(id) );
-        }); 
-      }
-
-      var load_script = function(win,uri,onload){
-        var el = document.createElement('script');   
-        el.src = uri+'?_cacheForce_='+Math.round(Math.random()*999)+'#';
-        el.onload = onload;
-        win.document.documentElement.appendChild(el);
-      }
-
-      function execute(frame_el,option){
-        // store errors
-        var errors = [];
-        var win = frame_el.contentWindow;
-        var functions = [];
-
-        var async_tests_done = 0;
-        var async_tests_count = 0;
-        var async_result = true;
-        var set_async_result = function(testname){ 
-          return function(res){
-
-            log( option.value+'['+testname+']: '+ (res&&'OK'||'FAILED')  + ' (Asynchronous Report '+(async_tests_done+1)+','+async_tests_count+' )' );
-
-            if(!res)
-              async_result = false;
-
-            if(++async_tests_done>=async_tests_count){
-              option.className = !async_result&&'Failure'||'Success';
+              return cases;
             }
 
-          }
-        }
+            var init = exports.init = function(){
+              status('Initializing...');
 
-        // collect functions whose name starts width 'test' (e.g: testSomething)
-        for(var key in win){
-          if(key.substring(0,5)=='test_' && typeof win[ key  ] == 'function' ){
-            var fn = [ win[key], key ];
-            functions.push(fn);
-            if(win[key].async){
-              win[key].__defineSetter__('result',set_async_result(key));
-              async_tests_count++;
+              scripts.splice(0);
+              scripts.push( $('info-file').getAttribute('data-path') );
+
+              each( $('info-file').getAttribute('data-dependencies').split('|'), function(el){
+                /[^\s]+/.test(el) && scripts.push(el);
+              });
+
+              load(scripts,set);
             }
-          }
-        }
 
-        // execute found functions
-        var start_date=Number(new Date());
-        for(var i=-1,len=functions.length; ++i<len;){
-          var fn = functions[i];
-          try {
-            fn[0]();
-          } catch(e){
-            errors.push( [ fn[1], e ] );
-          }
-        }
-        var testduration = ((Number(new Date())-start_date)/1000)+'s';
-        
-        if(async_tests_count<=async_tests_done)
-          option.className = functions.length? errors.length?'Failure':'Success' : '';
-        
-        async_result = errors.length==0;
-        
-        // print errors
-        for(var i=-1,len=errors.length; ++i<len;){
-          var error = errors[i];
-          log_error(option.value,error[0],error[1]);
-        }
+            var load = exports.load = function(scripts,callback){
+              status('Loading...');
+              var tasks = 0;
+              var unloaded = scripts.slice(0);
+              
+              if(trident){
+                sources = [];
+                var unloadedSources = scripts.slice(0);
+                unloadedSources.length && tasks++;
+                for(var i=-1,len=scripts.length; ++i<len;){
+                  var path = scripts[i];
+                  fetch(path,(function(path){
+                    return function(req){
+                      var ind = index( unloadedSources, path );
+                      sources[ index(scripts,path) ] = req.responseText;
+                      if(ind>-1){
+                        unloadedSources = remove( unloadedSources, ind );
+                      }
+                      unloadedSources.length == 0 && tasks--;
+                      tasks == 0 && callback();
+                    }
+                  })(path));
+                }
 
-        // print test result
-        log(option.value+': Ran '+functions.length+' tests in '+testduration);
-        if(errors.length)
-          log(option.value+': FAILED(errors='+errors.length+')');
-        else if(async_tests_count>async_tests_done)
-          log(option.value+': Waiting For Asynchronous Results('+async_tests_done+','+async_tests_count+')');
-        else
-          log(option.value+': OK.');
-        
-      }
+              }
+              
+              unloaded.length && tasks++;
+              for(var i=-1,len=scripts.length; ++i<len;){
+                var script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.defer = "defer";
+                script.src = scripts[i];
+                script.onload = script.onreadystatechange = function(){
+                  var path = this.getAttribute('src'), readystate = this.readyState;
+                  if( readystate && readystate!='complete' && readystate!='loaded') return;
+                  var ind = index( unloaded, path );
+                  if(ind>-1){
+                    unloaded = remove(unloaded, ind);
+                  }
 
-      function load_fblite(win){
-        (function(F,B,L,i,t,e){
-          e=F[B]('script');
-          e.id='FirebugLite';
-          e.src=L+t;
-          F.getElementsByTagName('head')[0].appendChild(e);
-          e=F[B]('img');
-          e.src=L+i;
-        })(
-          win.document,'createElement','http://getfirebug.com/releases/lite/alpha/','skin/xp/sprite.png','firebug.jgz#startOpened'
-        ); 
-      }
+                  unloaded.length == 0 && tasks--;
+                  tasks == 0 && callback();
+                }
+                document.documentElement.firstChild.appendChild( script );
+              }
 
-      function log_error(url,test,error){
-        log('\n================================');
-        log('ERROR: ' + test + ' ('+url+')');
-        log(error.name+': '+error.message)
-        log( '-------------------------------');
-        log( error.stack );
-        log( '-------------------------------');
-        log('================================\n');
-      }
+              tasks == 0 && callback();
+            }
 
-      function run_selected(){
-        document.getElementById('logview').value='';
-        var list = document.getElementById('module_list');
-        var option = list.options[list.selectedIndex];
-        list.selectedIndex = -1;
-        load(option,true);
-      }
+            var log = exports.log = function(){
+              var d = new Date();
+              var args = Array.prototype.splice.call(arguments,0,0, '<label class="testrunner-monitor-date">'+[d.getFullYear(),(d.getMonth()+1),d.getDate()].join("-")+" "+[d.getHours(),d.getMinutes(),d.getSeconds()].join(":")+"."+d.getMilliseconds()+"</label>" );
+              return put( Array.prototype.join.call( arguments, ', ' ), 'Log' );
+            };
 
-      function run_all(){
-        document.getElementById('logview').value='';
-        var list = document.getElementById('module_list');
-        for(var i=-1,len=list.options.length; ++i<len;){
-          var option = list.options[i];
-          load(option);
-        }
-      }
+            var progress = exports.progress = function(percent){
+              percent = Math.floor(percent);
+              $('progressbar-fill').innerHTML = '&nbsp;'+percent+'%&nbsp;';
+              $('progressbar-fill').style.width = percent>5 && percent+'%' || '30px';
+            }
+          
+            var put = exports.put = function(str,cls){
+              var rec = document.createElement('div');
+              rec.innerHTML = str;
+              rec.setAttribute('class','testrunner-monitor-rec '+cls);
+              rec.setAttribute('id','testrunner-rec-'+( ++recordCreationCounter ));
+              $('monitor').appendChild( rec );
+              return rec;
+            };
 
-      function log(){
-        var rec = Array.prototype.join.call( arguments, ' ');
-        var logview = document.getElementById('logview');
-        logview.value+=rec+'\n';
-      }
+            var run = exports.run = function(callback){
+              var container = put('<div style="clear:both"></div>','testrunner-result');
+              var statusline = container.childNodes[0];
+              var time = 0;  
+              var uncompleted = cases.slice(0);
 
-      function resize(){
-        var vpheight=Math.max( document.body.clientHeight, document.documentElement.clientHeight );
-        var modlist = document.getElementById('module_list');
-        var monitor = document.getElementById('logview');
-        var frame = document.getElementsByTagName('iframe')[0];
-        var display_frame = frame&&frame.parentNode==monitor.parentNode;
+              progress(0);
 
-        if(display_frame){
-          monitor.style.height=Math.round((vpheight-62)/2)+'px'
-          frame.style.height=Math.round((vpheight-72)/2)+'px'
-        } else
-          monitor.style.height=vpheight-62+'px';
-        modlist.style.height=vpheight-70+'px';
-      }
+              for(var i=-1,len=cases.length; ++i<len;){
+                status('Running tests('+(len-uncompleted.length)+','+len+')');
+                
+                test(cases[i],function(result){
+                  status('Running tests('+(len-uncompleted.length+1)+','+len+')');
+                  var ind = index(uncompleted,result.test); 
+                  if( ind == -1 ) return;
+                  uncompleted = remove(uncompleted,ind);
+                  var diff = ((result.timeEnd-result.timeStart)/1000);
+                  time+=diff;
+                  var el = document.createElement('ul');
+                  el.setAttribute(trident&&'className'||'class','testrunner-case'+(result.error&&' testrunner-error'||''));
+                  el.innerHTML+='<li class="testrunner-case-header"><label>Case:</label>'+result.test.name+'</li>';
+                  el.innerHTML+='<li class="testrunner-case-header"><label>Time:</label>'+diff+'sec</li>';
+                  if(result.error){
+                    for(var name in result.error){
+                      el.innerHTML+='<li><label>'+name+':</label>'+result.error[name]+'</li>';
+                    }
+                  }
+                  container.insertBefore( el, container.lastChild );
+                  progress( (len-uncompleted.length)*100/len );
+                  if( uncompleted.length == 0 ){
+                    status('Ready');
+                    $('info-time').innerHTML=time+'sec';
+                    callback && callback();
+                  }
+                });
+              }
 
-      window.addEventListener('DOMContentLoaded',init,false);
-      window.addEventListener('resize',resize,false);
-      ]]>
-    </script>
-  </head>
-  <body>
-    <table>
-      <tr>
-        <td class='ListWrapper' style='width:30%'>
-          <fieldset class='ModuleList'>
-            <legend>Test Cases</legend>
-            <select id='module_list' multiple='true'>
-              <xsl:for-each select="testcases/case">
-              <option>
-                <xsl:attribute name="dependencies">
-                  <xsl:for-each select="dependency">
-                    <xsl:value-of select="@src" />;
-                  </xsl:for-each>
-                </xsl:attribute>
-                <xsl:if test='@display'>
-                  <xsl:attribute name='display'>true</xsl:attribute>
-                </xsl:if>
-                <xsl:if test='@firebug'>
-                  <xsl:attribute name='firebug'>true</xsl:attribute>
-                </xsl:if>
-                <xsl:value-of select='file/@src' />
-              </option>
-              </xsl:for-each>
-            </select>
-            <button id='run_sel'>Run Selected</button>
-            <button id='run_all'>Run All</button>
-          </fieldset>
-        </td>
-        <td>
-          <fieldset class='Log'>
-            <legend>MONITOR</legend>
-            <textarea id='logview'></textarea>
-          </fieldset>
-        </td>
-      </tr>
-    </table>
-  </body>
-  </html>
-</xsl:template>
+            };
 
+            var test = exports.test = function(testcase,callback){
+              var result = { test:testcase, timeStart:0, timeEnd:0, error:null };
+              result.callback = function(){
+                result.timeEnd = Number( new Date() );
+                callback(result);
+              };
+              setTimeout(function(){
+                try {
+                  result.timeStart = Number( new Date() );
+                  testcase(result);
+                } catch(exc){
+                  result.error = exc;
+                };
+                !( 'async' in testcase ) && result.callback();
+              },10);
+            }
+
+            var set = exports.set = function(){
+              status('Setting Tests...');
+              findCases();
+              clear();
+              log( navigator.userAgent );
+              status('Ready');
+            }
+
+            var status = exports.status = function(str){ 
+              $('info-status').innerHTML=str;
+            };
+
+            ( window.addEventListener || window.attachEvent )( ( window.attachEvent && 'on' || '' )+'load', init, false );
+
+          })( window.testrunner = {} );
+
+          function assert(expr,desc){
+              if(!expr){
+                throw new Error('Assertion Error'+(desc&&': '+desc||expr));
+              }
+          };
+
+          function compare(){
+            if( arguments[0] != arguments[1] ){
+              throw new Error('Comparison Error: '+Array.prototype.join.call(arguments,', '));
+            }
+          };
+        ]]></script>
+        <style type="text/css" media="screen">
+          html, body { width:100%; height:100%; margin:0; padding:0; color:#333; }
+          #testrunner-container { height:100%; background:#fff; font:12px Arial,sans-serif; }
+          #testrunner-head { background:#ccc; margin-top:0; padding-top:10px; }
+          #testrunner-progressbar { margin:0 20px 10px 20px; background:#fff; }
+          #testrunner-progressbar-fill { display:block; width:0%; padding:5px 0; background:rgb(100,180,205); color:#fff; text-align:right; font-weight:bold; }
+
+          #testrunner-nav { background:#ddd; padding:10px 20px; }
+          #testrunner-nav-buttons { margin:0 auto; }
+
+          #testrunner-info { list-style:none; padding:0 0 10px 0; margin:0; }
+          #testrunner-info li { display:inline; padding:0 5px 10px 0; color:#111; }
+          #testrunner-info label { color:#666;  }
+
+          #testrunner-monitor { padding:10px 20px; font-size:10px; background:#fff; }
+
+          .testrunner-monitor-date { color:#888; }
+          .testrunner-button { display:inline; border:1px outset #ccc; padding:2px 5px; background:#f2f2f2; cursor:pointer; margin-right:2px; }
+          .testrunner-button:hover { background:rgb(255,255,175); }
+
+          .testrunner-result { padding:10px; }
+          .testrunner-result-statusline { font-weight:bold;  }
+          .testrunner-case { display:block; float:left; padding:5px; margin:2px; background:#ddffdd; list-style:none; }
+          .testrunner-case li { white-space:pre; }
+          .testrunner-case li label { font-weight:bold; padding-right:2px; color:#337733; }
+          .testrunner-error .testrunner-case-header { background:#ffdddd;  }
+          .testrunner-error { background:#ffcccc; }
+          .testrunner-error li label { color:#cc3333; }
+        </style>
+      </head>
+      <body>
+        <div id="testrunner-container">
+          <div id='testrunner-head'>
+            <div id='testrunner-progressbar'>
+              <div id='testrunner-progressbar-fill'></div>
+            </div>
+            <div id='testrunner-nav'>
+              <ul id='testrunner-info'>
+                <li>
+                  Name: <label id='testrunner-info-name'><xsl:value-of select='test/@name' /></label>
+                </li>
+                <li>
+                  Status: <label id='testrunner-info-status'>Uninitialized</label>
+                </li>
+                <li>
+                  Path: 
+                  <label id='testrunner-info-file'>
+                    <xsl:attribute name='data-path'>
+                      <xsl:value-of select='test/@path' />
+                    </xsl:attribute>
+                    <xsl:attribute name='data-dependencies'>
+                      <xsl:for-each select='test/dependency'>
+                        <xsl:value-of select='@path' />|
+                      </xsl:for-each>
+                    </xsl:attribute>
+                    <xsl:value-of select='test/@path' />
+                  </label>
+                </li>
+                <li>
+                  Case(s): <label id='testrunner-info-case'>0</label>
+                </li>
+                <li>
+                  Time: <label id='testrunner-info-time'>0.0</label>
+                </li>
+              </ul>
+              <div id='testrunner-nav-buttons'>
+                <div id='testrunner-nav-run' class='testrunner-button' onclick='testrunner.run()'>Run</div> 
+                <div id='testrunner-nav-clear' class='testrunner-button' onclick='testrunner.set()'>Reset</div> 
+                <div id='testrunner-nav-reload' class='testrunner-button' onclick='testrunner.load(testrunner.scripts,testrunner.set)'>Reload</div> 
+              </div>
+            </div>
+          </div>
+          <div id='testrunner-monitor'></div>
+        </div>
+      </body>
+    </html>
+  </xsl:template>
 </xsl:stylesheet>
